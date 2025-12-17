@@ -16,7 +16,11 @@ def AddTransactionPage(page_layout):
     date_picker = ft.DatePicker(
         on_change=change_date,
         first_date=datetime(2020, 1, 1),
-        last_date=datetime(2030, 12, 31)
+        last_date=datetime(2030, 12, 31),
+        # locale="pt-BR", <--- REMOVIDO (Causava o erro)
+        cancel_text="Cancelar",
+        confirm_text="Confirmar",
+        help_text="Selecione a data"
     )
 
     botao_data = ft.IconButton(
@@ -57,62 +61,65 @@ def AddTransactionPage(page_layout):
     )
 
     # --- CATEGORIA ---
-    cats_db = get_todas_categorias()
-    if not cats_db:
-        cats_db = ["Alimentação", "Transporte", "Moradia", "Lazer", "Outros"]
-    
-    categoria_dropdown = ft.Dropdown(
+    categoria_field = ft.TextField(
         expand=True,
-        label="Categoria (IA)",
-        options=[ft.dropdown.Option(x) for x in cats_db],
+        label="Categoria (IA ou Digite)",
         value="Outros",
         border_radius=8,
-        text_size=14
+        text_size=14,
+        hint_text="Ex: Salário, Mercado..."
     )
 
+    # --- VALOR ---
+    def on_valor_focus(e):
+        if valor_field.value in ["0,00", "0.00", "0"]:
+            valor_field.value = ""
+            valor_field.update()
+
+    def on_valor_blur(e):
+        if valor_field.value == "":
+            valor_field.value = "0,00"
+            valor_field.update()
+
+    valor_field = ft.TextField(
+        label="Valor Total (R$)", 
+        value="0,00", 
+        width=200, 
+        keyboard_type=ft.KeyboardType.NUMBER, 
+        border_radius=8,
+        prefix_text="R$ ",
+        on_focus=on_valor_focus,
+        on_blur=on_valor_blur
+    )
+
+    # --- LÓGICA DA IA ---
     def on_desc_blur(e):
         if desc_field.value and len(desc_field.value) > 2:
             loading_ring.visible = True
             page_layout.page.update()
             
-            lista_atual = [op.key for op in categoria_dropdown.options]
-            sugestao = classificar_transacao(desc_field.value, valor_field.value, lista_atual)
+            cats_existentes = get_todas_categorias()
+            if not cats_existentes:
+                 cats_existentes = ["Alimentação", "Transporte", "Lazer", "Salário"]
+
+            val_temp = valor_field.value.replace(",", ".") if valor_field.value else "0"
+            sugestao = classificar_transacao(desc_field.value, val_temp, cats_existentes)
             
             loading_ring.visible = False
+            categoria_field.value = sugestao
             
-            existe = False
-            for op in categoria_dropdown.options:
-                if op.key.lower() == sugestao.lower():
-                    categoria_dropdown.value = op.key
-                    existe = True
-                    break
-            
-            if not existe:
-                nova_op = ft.dropdown.Option(sugestao)
-                categoria_dropdown.options.append(nova_op)
-                categoria_dropdown.value = sugestao
-            
+            snack_text = f"Categoria sugerida: {sugestao}"
+            page_layout.page.open(ft.SnackBar(ft.Text(snack_text), duration=2000))
             page_layout.page.update()
 
     desc_field = ft.TextField(
         label="Descrição", 
-        hint_text="Ex: TV Nova", 
+        hint_text="Ex: Salário Mensal", 
         expand=True,
         on_blur=on_desc_blur,
         border_radius=8
     )
-    
-    # --- VALOR E PARCELAS ---
-    valor_field = ft.TextField(
-        label="Valor Total (R$)", 
-        hint_text="0.00", 
-        width=200, 
-        keyboard_type=ft.KeyboardType.NUMBER,
-        border_radius=8,
-        prefix_text="R$ "
-    )
 
-    # Campo de Parcelas (Começa com 1x)
     parcelas_field = ft.TextField(
         label="Parcelas",
         value="1",
@@ -137,23 +144,33 @@ def AddTransactionPage(page_layout):
             desc_field.update()
             return
         
+        valor_str = valor_field.value
+        valor_formatado = valor_str.replace(",", ".")
+        
+        try:
+            float(valor_formatado)
+        except ValueError:
+            valor_field.error_text = "Valor inválido"
+            valor_field.update()
+            return
+
         try:
             adicionar_transacao(
                 descricao=desc_field.value, 
-                valor=valor_field.value, 
+                valor=valor_formatado, 
                 tipo=tipo_dropdown.value,
-                categoria_nome=categoria_dropdown.value,
+                categoria_nome=categoria_field.value, 
                 conta_nome=conta_dropdown.value,
                 data_str=data_field.value,
-                num_parcelas=parcelas_field.value # Passamos as parcelas
+                num_parcelas=parcelas_field.value
             )
             
-            # Limpeza
             desc_field.value = ""
-            valor_field.value = ""
+            valor_field.value = "0,00"
             parcelas_field.value = "1"
             desc_field.error_text = None
-            categoria_dropdown.value = "Outros"
+            valor_field.error_text = None
+            categoria_field.value = "Outros"
             data_field.value = datetime.now().strftime("%d/%m/%Y") 
             
             snack = ft.SnackBar(ft.Text("Lançamento Salvo!"), bgcolor=ft.Colors.GREEN_600)
@@ -184,19 +201,15 @@ def AddTransactionPage(page_layout):
                     controls=[
                         ft.Row([data_field, ft.Container(width=10), conta_dropdown], alignment=ft.MainAxisAlignment.CENTER),
                         ft.Row([desc_field, loading_ring]),
-                        categoria_dropdown,
-                        
-                        # LINHA DO VALOR + PARCELAS + TIPO
+                        categoria_field,
                         ft.Row([
                             valor_field, 
                             ft.Container(width=10), 
-                            parcelas_field, # Campo Novo
+                            parcelas_field, 
                             ft.Container(width=10), 
                             tipo_dropdown
                         ], alignment=ft.MainAxisAlignment.CENTER),
-                        
                         ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
-                        
                         ft.ElevatedButton(
                             text="Confirmar Lançamento",
                             icon=ft.Icons.CHECK,
