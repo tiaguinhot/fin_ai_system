@@ -1,25 +1,29 @@
 import flet as ft
 from ui.app_layout import AppLayout
+import os
 
 def main(page: ft.Page):
     page.title = "FinAI System"
-    
-    # Define o Modo Claro
     page.theme_mode = ft.ThemeMode.LIGHT 
     
-    # Configura o Tema com a cor Semente (Indigo)
+    # OTIMIZAÇÃO 1: Mudamos para STANDARD para reduzir espaços desnecessários globalmente
     page.theme = ft.Theme(
         color_scheme_seed=ft.Colors.INDIGO, 
-        # CORREÇÃO AQUI: Mudou de ThemeVisualDensity para VisualDensity
-        visual_density=ft.VisualDensity.COMFORTABLE,
+        visual_density=ft.VisualDensity.STANDARD, 
         font_family="Roboto",
         use_material3=True
     )
     
     page.padding = 0
-    page.window.width = 1100
-    page.window.height = 800
+    # Tamanhos ajustados para desktop
+    page.window.width = 1000
+    page.window.height = 700
+    page.window.min_width = 800
+    page.window.min_height = 600
     
+    # Centraliza a janela ao abrir
+    page.window.center()
+
     layout = AppLayout(page)
     page.add(layout)
 
