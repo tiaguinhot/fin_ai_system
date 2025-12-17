@@ -246,3 +246,22 @@ def get_gastos_por_categoria():
         
     session.close()
     return dados
+
+def get_saldos_por_conta():
+    session = get_session()
+    contas = session.query(Conta).all()
+    resultado = []
+    
+    for c in contas:
+        # Soma as transações vinculadas a esta conta
+        total_transacoes = sum(t.valor for t in c.transacoes)
+        saldo_atual = c.saldo_inicial + total_transacoes
+        
+        resultado.append({
+            "nome": c.nome,
+            "tipo": c.tipo,
+            "saldo": saldo_atual
+        })
+    
+    session.close()
+    return resultado

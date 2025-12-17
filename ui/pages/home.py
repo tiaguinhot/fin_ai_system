@@ -1,6 +1,13 @@
 import flet as ft
 from ui.components import DonutChart
-from database.db_manager import get_saldo_total, get_ultimas_transacoes, deletar_transacao, editar_transacao, get_gastos_por_categoria 
+from database.db_manager import (
+    get_saldo_total, 
+    get_ultimas_transacoes, 
+    deletar_transacao, 
+    editar_transacao, 
+    get_gastos_por_categoria,
+    get_saldos_por_conta
+)
 
 def HomePage(page: ft.Page):
     
@@ -36,6 +43,9 @@ def HomePage(page: ft.Page):
     txt_saldo = ft.Text("R$ 0,00", size=32, weight=ft.FontWeight.BOLD, color=ft.Colors.BLACK87) 
     area_grafico = ft.Container()
     
+    # Nova área para os cards das contas
+    linha_contas = ft.Row(scroll=ft.ScrollMode.HIDDEN, spacing=15)
+    
     tabela = ft.DataTable(
         column_spacing=20,
         heading_row_height=35,
@@ -52,16 +62,57 @@ def HomePage(page: ft.Page):
     )
 
     def carregar_tudo(atualizar_tela=False):
+        # 1. Saldo Geral
         saldo = get_saldo_total()
         txt_saldo.value = f"R$ {saldo:.2f}"
         txt_saldo.color = ft.Colors.BLACK87 if saldo >= 0 else ft.Colors.RED_600
         
+        # 2. Gráfico
         dados_grafico = get_gastos_por_categoria()
         area_grafico.content = DonutChart(dados_grafico)
 
+        # 3. Saldos Individuais
+        dados_contas = get_saldos_por_conta()
+        linha_contas.controls = []
+        for c in dados_contas:
+            # Estilização por tipo
+            if c['tipo'] == 'Crédito':
+                icone, cor_icon, bg_icon = ft.Icons.CREDIT_CARD, ft.Colors.PURPLE, ft.Colors.PURPLE_50
+                label_saldo = "Fatura Atual"
+            elif c['tipo'] == 'Investimento':
+                icone, cor_icon, bg_icon = ft.Icons.TRENDING_UP, ft.Colors.ORANGE, ft.Colors.ORANGE_50
+                label_saldo = "Valor Investido"
+            elif c['tipo'] == 'Dinheiro':
+                icone, cor_icon, bg_icon = ft.Icons.MONEY, ft.Colors.GREEN, ft.Colors.GREEN_50
+                label_saldo = "Em Mãos"
+            else: # Corrente
+                icone, cor_icon, bg_icon = ft.Icons.ACCOUNT_BALANCE_WALLET, ft.Colors.BLUE, ft.Colors.BLUE_50
+                label_saldo = "Saldo Atual"
+            
+            cor_valor = ft.Colors.RED if c['saldo'] < 0 else ft.Colors.BLACK87
+            
+            card_conta = ft.Container(
+                width=180,
+                height=110,
+                padding=15,
+                bgcolor=ft.Colors.WHITE,
+                border_radius=12,
+                shadow=ft.BoxShadow(blur_radius=8, color=ft.Colors.BLACK12),
+                content=ft.Column([
+                    ft.Row([
+                        ft.Container(content=ft.Icon(icone, size=18, color=cor_icon), bgcolor=bg_icon, padding=6, border_radius=6),
+                        ft.Text(c['nome'], size=13, weight="bold", color=ft.Colors.GREY_800, overflow=ft.TextOverflow.ELLIPSIS, expand=True)
+                    ]),
+                    ft.Container(expand=True),
+                    ft.Text(label_saldo, size=10, color=ft.Colors.GREY_500),
+                    ft.Text(f"R$ {c['saldo']:,.2f}", size=16, weight="bold", color=cor_valor)
+                ])
+            )
+            linha_contas.controls.append(card_conta)
+
+        # 4. Tabela
         dados = get_ultimas_transacoes(50) 
         tabela.rows = []
-        
         for t in dados:
             def on_delete(e, id_t=t['id']):
                 deletar_transacao(id_t)
@@ -74,7 +125,8 @@ def HomePage(page: ft.Page):
                 page.open(dialog_edit) 
                 page.update()
 
-            cor_valor = ft.Colors.EMERALD_600 if t['valor'] > 0 else ft.Colors.RED_600
+            # CORREÇÃO DA COR AQUI (EMERALD -> GREEN)
+            cor_valor = ft.Colors.GREEN_600 if t['valor'] > 0 else ft.Colors.RED_600
             
             tabela.rows.append(
                 ft.DataRow(
@@ -109,55 +161,60 @@ def HomePage(page: ft.Page):
 
     return ft.Column(
         expand=True,
-        spacing=15, 
+        spacing=20, 
+        scroll=ft.ScrollMode.AUTO, 
         controls=[
             ft.Text("Visão Geral", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.BLACK87),
             
-            ft.Row(
-                height=250, 
+            # --- SEÇÃO 1: RESUMO ---
+            ft.ResponsiveRow(
                 controls=[
                     # CARD SALDO
                     ft.Container(
-                        expand=1, 
-                        padding=20,
-                        bgcolor=ft.Colors.WHITE,
-                        border_radius=15,
+                        col={"xs": 12, "md": 6}, 
+                        padding=20, bgcolor=ft.Colors.WHITE, border_radius=15,
                         shadow=ft.BoxShadow(blur_radius=10, color=ft.Colors.BLACK12),
                         content=ft.Column([
                             ft.Text("Saldo Disponível", size=12, color=ft.Colors.GREY_500),
                             txt_saldo,
                             ft.Container(height=10),
                             ft.Icon(ft.Icons.ACCOUNT_BALANCE, size=30, color=ft.Colors.INDIGO_100)
-                        ], alignment=ft.MainAxisAlignment.CENTER) # Centraliza conteúdo do saldo
+                        ], alignment=ft.MainAxisAlignment.CENTER),
+                        height=200 
                     ),
-                    ft.Container(width=15),
+                    
                     # CARD GRÁFICO
                     ft.Container(
-                        expand=1, 
-                        padding=15,
-                        bgcolor=ft.Colors.WHITE,
-                        border_radius=15,
+                        col={"xs": 12, "md": 6}, 
+                        padding=15, bgcolor=ft.Colors.WHITE, border_radius=15,
                         shadow=ft.BoxShadow(blur_radius=10, color=ft.Colors.BLACK12),
                         content=ft.Column([
                             ft.Text("Despesas por Categoria", size=12, weight="bold", color=ft.Colors.GREY_600),
                             area_grafico
                         ], 
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                        alignment=ft.MainAxisAlignment.CENTER) # Centraliza o gráfico verticalmente
+                        alignment=ft.MainAxisAlignment.CENTER),
+                        height=200
                     )
                 ]
             ),
             
-            ft.Text("Últimas Movimentações", size=16, weight=ft.FontWeight.W_600, color=ft.Colors.BLACK87),
+            # --- SEÇÃO 2: CARDS DE CONTAS ---
+            ft.Column([
+                ft.Text("Minhas Contas", size=16, weight=ft.FontWeight.W_600, color=ft.Colors.BLACK87),
+                linha_contas 
+            ], spacing=10),
             
-            # Tabela
-            ft.Container(
-                expand=True,
-                bgcolor=ft.Colors.WHITE,
-                border_radius=15,
-                padding=5,
-                shadow=ft.BoxShadow(blur_radius=10, color=ft.Colors.BLACK12),
-                content=ft.ListView(controls=[tabela], expand=True, auto_scroll=False)
-            )
+            # --- SEÇÃO 3: TABELA ---
+            ft.Column([
+                ft.Text("Últimas Movimentações", size=16, weight=ft.FontWeight.W_600, color=ft.Colors.BLACK87),
+                ft.Container(
+                    bgcolor=ft.Colors.WHITE,
+                    border_radius=15,
+                    padding=5,
+                    shadow=ft.BoxShadow(blur_radius=10, color=ft.Colors.BLACK12),
+                    content=tabela 
+                )
+            ], spacing=10)
         ]
     )

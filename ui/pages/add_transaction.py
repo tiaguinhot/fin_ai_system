@@ -17,7 +17,6 @@ def AddTransactionPage(page_layout):
         on_change=change_date,
         first_date=datetime(2020, 1, 1),
         last_date=datetime(2030, 12, 31),
-        # locale="pt-BR", <--- REMOVIDO (Causava o erro)
         cancel_text="Cancelar",
         confirm_text="Confirmar",
         help_text="Selecione a data"
@@ -32,11 +31,11 @@ def AddTransactionPage(page_layout):
     data_field = ft.TextField(
         label="Data",
         value=datetime.now().strftime("%d/%m/%Y"),
-        width=160,
         read_only=True,
         suffix=botao_data,
         border_radius=8,
-        text_size=14
+        text_size=14,
+        col={"xs": 12, "md": 6} # Metade da tela no PC, inteira no Celular
     )
     
     # --- CONTA ---
@@ -51,23 +50,23 @@ def AddTransactionPage(page_layout):
         valor_padrao_conta = "Sem Conta"
 
     conta_dropdown = ft.Dropdown(
-        width=220,
         label="Conta / Cartão",
         options=opcoes_contas,
         value=valor_padrao_conta,
         icon=ft.Icons.WALLET,
         border_radius=8,
-        text_size=14
+        text_size=14,
+        col={"xs": 12, "md": 6} # Metade da tela no PC
     )
 
     # --- CATEGORIA ---
     categoria_field = ft.TextField(
-        expand=True,
         label="Categoria (IA ou Digite)",
         value="Outros",
         border_radius=8,
         text_size=14,
-        hint_text="Ex: Salário, Mercado..."
+        hint_text="Ex: Salário, Mercado...",
+        col={"xs": 12} # Linha inteira
     )
 
     # --- VALOR ---
@@ -82,17 +81,17 @@ def AddTransactionPage(page_layout):
             valor_field.update()
 
     valor_field = ft.TextField(
-        label="Valor Total (R$)", 
+        label="Valor (R$)", 
         value="0,00", 
-        width=200, 
         keyboard_type=ft.KeyboardType.NUMBER, 
         border_radius=8,
         prefix_text="R$ ",
         on_focus=on_valor_focus,
-        on_blur=on_valor_blur
+        on_blur=on_valor_blur,
+        col={"xs": 12, "md": 4} # 1/3 da linha no PC
     )
 
-    # --- LÓGICA DA IA ---
+    # --- DESCRICAO & IA ---
     def on_desc_blur(e):
         if desc_field.value and len(desc_field.value) > 2:
             loading_ring.visible = True
@@ -115,27 +114,28 @@ def AddTransactionPage(page_layout):
     desc_field = ft.TextField(
         label="Descrição", 
         hint_text="Ex: Salário Mensal", 
-        expand=True,
         on_blur=on_desc_blur,
-        border_radius=8
+        border_radius=8,
+        suffix=loading_ring,
+        col={"xs": 12} # Linha inteira
     )
 
     parcelas_field = ft.TextField(
         label="Parcelas",
         value="1",
-        width=100,
         keyboard_type=ft.KeyboardType.NUMBER,
         border_radius=8,
         text_align=ft.TextAlign.CENTER,
-        suffix_text="x"
+        suffix_text="x",
+        col={"xs": 6, "md": 4} # Metade no celular, 1/3 no PC
     )
     
     tipo_dropdown = ft.Dropdown(
-        width=150,
         label="Tipo",
         options=[ft.dropdown.Option("despesa", "Despesa"), ft.dropdown.Option("receita", "Receita")],
         value="despesa",
-        border_radius=8
+        border_radius=8,
+        col={"xs": 6, "md": 4} # Metade no celular, 1/3 no PC
     )
 
     def salvar_click(e):
@@ -182,49 +182,54 @@ def AddTransactionPage(page_layout):
             page_layout.page.open(snack)
             page_layout.page.update()
 
+    # --- LAYOUT DINÂMICO ---
+    # Usamos ResponsiveRow para o formulário se adaptar
+    formulario = ft.ResponsiveRow(
+        controls=[
+            data_field,
+            conta_dropdown,
+            desc_field,
+            categoria_field,
+            valor_field,
+            parcelas_field,
+            tipo_dropdown
+        ],
+        spacing=20,
+        run_spacing=20
+    )
+
     return ft.Column(
         expand=True,
         alignment=ft.MainAxisAlignment.CENTER,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         controls=[
             ft.Text("Novo Lançamento", size=24, weight="bold", color=ft.Colors.BLACK87),
-            ft.Container(height=20),
+            ft.Container(height=10),
             
             ft.Container(
-                padding=30,
+                padding=40,
                 bgcolor=ft.Colors.WHITE,
                 border_radius=15,
-                width=700,
+                # Largura máxima limitada para não ficar "esticado demais" em monitores gigantes
+                # mas flexível em menores
+                width=800, 
                 shadow=ft.BoxShadow(blur_radius=20, color=ft.Colors.BLACK12, offset=ft.Offset(0, 5)),
-                content=ft.Column(
-                    spacing=20,
-                    controls=[
-                        ft.Row([data_field, ft.Container(width=10), conta_dropdown], alignment=ft.MainAxisAlignment.CENTER),
-                        ft.Row([desc_field, loading_ring]),
-                        categoria_field,
-                        ft.Row([
-                            valor_field, 
-                            ft.Container(width=10), 
-                            parcelas_field, 
-                            ft.Container(width=10), 
-                            tipo_dropdown
-                        ], alignment=ft.MainAxisAlignment.CENTER),
-                        ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
-                        ft.ElevatedButton(
-                            text="Confirmar Lançamento",
-                            icon=ft.Icons.CHECK,
-                            style=ft.ButtonStyle(
-                                bgcolor=ft.Colors.INDIGO, 
-                                color=ft.Colors.WHITE, 
-                                padding=20,
-                                shape=ft.RoundedRectangleBorder(radius=10)
-                            ),
-                            on_click=salvar_click,
-                            width=300
-                        )
-                    ],
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER
-                )
+                content=ft.Column([
+                    formulario,
+                    ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
+                    ft.ElevatedButton(
+                        text="Confirmar Lançamento",
+                        icon=ft.Icons.CHECK,
+                        style=ft.ButtonStyle(
+                            bgcolor=ft.Colors.INDIGO, 
+                            color=ft.Colors.WHITE, 
+                            padding=20,
+                            shape=ft.RoundedRectangleBorder(radius=10)
+                        ),
+                        on_click=salvar_click,
+                        width=300 # Botão mantém tamanho fixo para elegância
+                    )
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER)
             )
         ]
     )
